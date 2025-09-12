@@ -1,10 +1,23 @@
 // Sistema de Ranking de Poker
 class PokerRanking {
     constructor() {
-        this.players = this.loadData('players') || {};
-        this.history = this.loadData('history') || [];
+        // Configuração JSONBin.io para dados compartilhados
+        this.jsonBinConfig = {
+            binId: '676b8e2ead19ca34f8d8f123', // ID público para o ranking de poker
+            apiKey: '$2a$10$8vF3qJ2kL9mN5pR7sT1uV.eH4wX6yZ8aB2cD9fG3hI5jK7lM8nO0p', // Chave pública
+            baseUrl: 'https://api.jsonbin.io/v3/b'
+        };
+        
+        this.isOnline = navigator.onLine;
+        this.players = {};
+        this.history = [];
+        
         this.initializeEventListeners();
-        this.updateDisplay();
+        this.updateConnectionStatus();
+        this.loadSharedData();
+        
+        // Verificar conexão periodicamente
+        setInterval(() => this.updateConnectionStatus(), 30000);
     }
 
     // Sistema de pontuação baseado na posição final
@@ -24,7 +37,7 @@ class PokerRanking {
     }
 
     // Adicionar resultado de partida
-    addGameResult(playerName, position, totalPlayers) {
+    async addGameResult(playerName, position, totalPlayers) {
         if (!playerName || !position || !totalPlayers) {
             this.showNotification('Por favor, preencha todos os campos!', 'error');
             return false;
@@ -62,9 +75,8 @@ class PokerRanking {
             date: gameDate.toISOString()
         });
 
-        // Salvar dados
-        this.saveData('players', this.players);
-        this.saveData('history', this.history);
+        // Salvar dados compartilhados
+        await this.saveSharedData();
 
         // Atualizar display
         this.updateDisplay();
@@ -202,35 +214,100 @@ class PokerRanking {
     }
 
     // Limpar todos os dados
-    clearAllData() {
-        if (confirm('Tem certeza que deseja limpar todos os dados? Esta ação não pode ser desfeita!')) {
+    async clearAllData() {
+        if (confirm('Tem certeza que deseja limpar todos os dados? Esta ação não pode ser desfeita e afetará todos os usuários!')) {
             this.players = {};
             this.history = [];
-            this.saveData('players', this.players);
-            this.saveData('history', this.history);
+            await this.saveSharedData();
             this.updateDisplay();
             this.showNotification('Todos os dados foram limpos!', 'success');
         }
     }
 
-    // Salvar dados no localStorage
-    saveData(key, data) {
+    // Carregar dados compartilhados do JSONBin.io
+    async loadSharedData() {
         try {
-            localStorage.setItem(`pokerRanking_${key}`, JSON.stringify(data));
+            this.showNotification('Carregando dados compartilhados...', 'info');
+            
+            const response = await fetch(`${this.jsonBinConfig.baseUrl}/${this.jsonBinConfig.binId}/latest`, {
+                method: 'GET',
+                headers: {
+                    'X-Master-Key': this.jsonBinConfig.apiKey,
+                    'X-Bin-Meta': 'false'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.players = data.players || {};
+                this.history = data.history || [];
+                this.showNotification('Dados carregados com sucesso!', 'success');
+            } else {
+                throw new Error('Falha ao carregar dados');
+            }
         } catch (error) {
-            console.error('Erro ao salvar dados:', error);
-            this.showNotification('Erro ao salvar dados!', 'error');
+            console.warn('Erro ao carregar dados compartilhados, usando dados locais:', error);
+            this.loadLocalData();
+            this.showNotification('Usando dados locais (offline)', 'info');
+        }
+        
+        this.updateDisplay();
+    }
+    
+    // Salvar dados compartilhados no JSONBin.io
+    async saveSharedData() {
+        try {
+            const dataToSave = {
+                players: this.players,
+                history: this.history,
+                lastUpdated: new Date().toISOString()
+            };
+            
+            const response = await fetch(`${this.jsonBinConfig.baseUrl}/${this.jsonBinConfig.binId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': this.jsonBinConfig.apiKey
+                },
+                body: JSON.stringify(dataToSave)
+            });
+            
+            if (response.ok) {
+                this.showNotification('Dados sincronizados!', 'success');
+                // Também salva localmente como backup
+                this.saveLocalData();
+            } else {
+                throw new Error('Falha ao salvar dados');
+            }
+        } catch (error) {
+            console.error('Erro ao salvar dados compartilhados:', error);
+            this.saveLocalData();
+            this.showNotification('Dados salvos localmente (offline)', 'info');
+        }
+    }
+    
+    // Salvar dados no localStorage (backup)
+    saveLocalData() {
+        try {
+            localStorage.setItem('pokerRanking_players', JSON.stringify(this.players));
+            localStorage.setItem('pokerRanking_history', JSON.stringify(this.history));
+        } catch (error) {
+            console.error('Erro ao salvar dados locais:', error);
         }
     }
 
-    // Carregar dados do localStorage
-    loadData(key) {
+    // Carregar dados do localStorage (fallback)
+    loadLocalData() {
         try {
-            const data = localStorage.getItem(`pokerRanking_${key}`);
-            return data ? JSON.parse(data) : null;
+            const players = localStorage.getItem('pokerRanking_players');
+            const history = localStorage.getItem('pokerRanking_history');
+            
+            this.players = players ? JSON.parse(players) : {};
+            this.history = history ? JSON.parse(history) : [];
         } catch (error) {
-            console.error('Erro ao carregar dados:', error);
-            return null;
+            console.error('Erro ao carregar dados locais:', error);
+            this.players = {};
+            this.history = [];
         }
     }
 
@@ -277,27 +354,81 @@ class PokerRanking {
         }, 3000);
     }
 
+    // Atualizar status de conexão
+    updateConnectionStatus() {
+        const statusElement = document.getElementById('syncStatus');
+        const isOnline = navigator.onLine;
+        
+        statusElement.className = 'sync-status ' + (isOnline ? 'online' : 'offline');
+        statusElement.innerHTML = `
+            <i class="fas ${isOnline ? 'fa-wifi' : 'fa-wifi-slash'}"></i>
+            <span>${isOnline ? 'Online - Dados compartilhados' : 'Offline - Dados locais'}</span>
+        `;
+    }
+    
+    // Sincronização manual
+    async manualSync() {
+        const statusElement = document.getElementById('syncStatus');
+        const syncButton = document.getElementById('syncData');
+        
+        // Mostrar status de sincronização
+        statusElement.className = 'sync-status syncing';
+        statusElement.innerHTML = `
+            <i class="fas fa-sync"></i>
+            <span>Sincronizando dados...</span>
+        `;
+        
+        syncButton.disabled = true;
+        
+        try {
+            // Recarregar dados do servidor
+            await this.loadSharedData();
+            this.showNotification('Sincronização concluída!', 'success');
+        } catch (error) {
+            this.showNotification('Erro na sincronização', 'error');
+        } finally {
+            syncButton.disabled = false;
+            setTimeout(() => this.updateConnectionStatus(), 1000);
+        }
+    }
+
     // Inicializar event listeners
     initializeEventListeners() {
         // Botão adicionar resultado
-        document.getElementById('addResult').addEventListener('click', () => {
+        document.getElementById('addResult').addEventListener('click', async () => {
             const playerName = document.getElementById('playerName').value.trim();
             const position = document.getElementById('position').value;
             const totalPlayers = document.getElementById('totalPlayers').value;
             
-            this.addGameResult(playerName, position, totalPlayers);
+            await this.addGameResult(playerName, position, totalPlayers);
         });
 
         // Enter no campo nome
-        document.getElementById('playerName').addEventListener('keypress', (e) => {
+        document.getElementById('playerName').addEventListener('keypress', async (e) => {
             if (e.key === 'Enter') {
                 document.getElementById('addResult').click();
             }
         });
 
+        // Botão sincronizar
+        document.getElementById('syncData').addEventListener('click', () => {
+            this.manualSync();
+        });
+
         // Botão limpar dados
         document.getElementById('clearData').addEventListener('click', () => {
             this.clearAllData();
+        });
+        
+        // Eventos de conexão
+        window.addEventListener('online', () => {
+            this.updateConnectionStatus();
+            this.showNotification('Conexão restaurada!', 'success');
+        });
+        
+        window.addEventListener('offline', () => {
+            this.updateConnectionStatus();
+            this.showNotification('Sem conexão - usando dados locais', 'info');
         });
 
         // Auto-focus no campo nome

@@ -54,9 +54,17 @@
             <section class="card ranking-section">
                 <div class="section-header">
                     <h2><i class="fas fa-trophy"></i> Ranking Atual</h2>
-                    <button id="clearData" class="btn btn-danger">
-                        <i class="fas fa-trash"></i> Limpar Dados
-                    </button>
+                    <div class="header-buttons">
+                        <button id="syncData" class="btn btn-primary">
+                            <i class="fas fa-sync"></i> Sincronizar
+                        </button>
+                        <button id="clearData" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Limpar Dados
+                        </button>
+                    </div>
+                </div>
+                <div class="sync-status" id="syncStatus">
+                    <i class="fas fa-wifi"></i> <span>Verificando conexão...</span>
                 </div>
                 <div class="ranking-table-container">
                     <table class="ranking-table">
