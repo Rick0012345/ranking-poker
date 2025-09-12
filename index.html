@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ranking de Poker - Partidas Presenciais</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-spades"></i> Ranking de Poker</h1>
+                <p>Sistema de pontuação para partidas presenciais</p>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Seção de Nova Partida -->
+            <section class="card new-game-section">
+                <h2><i class="fas fa-plus-circle"></i> Nova Partida</h2>
+                <div class="new-game-form">
+                    <div class="form-group">
+                        <label for="playerName">Nome do Jogador:</label>
+                        <input type="text" id="playerName" placeholder="Digite o nome do jogador">
+                    </div>
+                    <div class="form-group">
+                        <label for="position">Posição Final:</label>
+                        <select id="position">
+                            <option value="">Selecione a posição</option>
+                            <option value="1">1º Lugar</option>
+                            <option value="2">2º Lugar</option>
+                            <option value="3">3º Lugar</option>
+                            <option value="4">4º Lugar</option>
+                            <option value="5">5º Lugar</option>
+                            <option value="6">6º Lugar</option>
+                            <option value="7">7º Lugar</option>
+                            <option value="8">8º Lugar</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="totalPlayers">Total de Jogadores:</label>
+                        <input type="number" id="totalPlayers" min="2" max="8" value="6">
+                    </div>
+                    <button id="addResult" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Adicionar Resultado
+                    </button>
+                </div>
+            </section>
+
+            <!-- Seção de Ranking -->
+            <section class="card ranking-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-trophy"></i> Ranking Atual</h2>
+                    <button id="clearData" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Limpar Dados
+                    </button>
+                </div>
+                <div class="ranking-table-container">
+                    <table class="ranking-table">
+                        <thead>
+                            <tr>
+                                <th>Posição</th>
+                                <th>Jogador</th>
+                                <th>Pontos</th>
+                                <th>Partidas</th>
+                                <th>Vitórias</th>
+                                <th>Média</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rankingTableBody">
+                            <!-- Dados serão inseridos via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Seção de Histórico -->
+            <section class="card history-section">
+                <h2><i class="fas fa-history"></i> Histórico de Partidas</h2>
+                <div class="history-container">
+                    <div id="historyList" class="history-list">
+                        <!-- Histórico será inserido via JavaScript -->
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2024 Ranking de Poker - Sistema para partidas presenciais</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
