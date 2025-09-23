@@ -1,23 +1,66 @@
 // Sistema de Ranking de Poker
 class PokerRanking {
     constructor() {
-        // Configuração JSONBin.io para dados compartilhados
-        this.jsonBinConfig = {
-            binId: '676b8e2ead19ca34f8d8f123', // ID público para o ranking de poker
-            apiKey: '$2a$10$8vF3qJ2kL9mN5pR7sT1uV.eH4wX6yZ8aB2cD9fG3hI5jK7lM8nO0p', // Chave pública
-            baseUrl: 'https://api.jsonbin.io/v3/b'
-        };
+        // Configuração da API do Google Apps Script
+        this.API_URL = 'https://script.google.com/macros/s/AKfycbwDQYuqtjIJqN3XW3e0U1U1AqL7MoUgI9bblHY0s6iBETroThMIrqoboLdzXColiVHq/exec';
         
-        this.isOnline = navigator.onLine;
+        // Modo de desenvolvimento - usar dados mock se a API não estiver funcionando
+        this.DEV_MODE = false; // Altere para true para usar dados mock
+        
         this.players = {};
         this.history = [];
+        this.isOnline = false;
         
-        this.initializeEventListeners();
-        this.updateConnectionStatus();
-        this.loadSharedData();
-        
-        // Verificar conexão periodicamente
-        setInterval(() => this.updateConnectionStatus(), 30000);
+        this.init();
+    }
+
+    // Salvar resultado no Google Sheets
+    async salvarResultado(data) {
+        try {
+            const resp = await fetch(this.API_URL, {
+                method: "POST",
+                body: JSON.stringify(data),
+                headers: { "Content-Type": "application/json" }
+            });
+            
+            if (!resp.ok) {
+                throw new Error(`Resposta inválida do servidor: ${resp.status}`);
+            }
+            
+            const result = await resp.json();
+
+            if (result.status !== "ok") {
+                console.error("Erro ao salvar:", result.message);
+                throw new Error(result.message || "Erro desconhecido no servidor");
+            }
+            
+            return result;
+        } catch (err) {
+            console.error("Falha na requisição:", err);
+            throw new Error("Falha de rede ao tentar salvar resultado");
+        }
+    }
+
+    // Carregar dados do ranking do Google Sheets
+    async carregarRanking() {
+        try {
+            const resp = await fetch(this.API_URL);
+            if (!resp.ok) {
+                throw new Error("Resposta inválida do servidor");
+            }
+
+            const dados = await resp.json();
+
+            if (!dados.players || !dados.history) {
+                throw new Error("Formato de dados inesperado");
+            }
+
+            return dados;
+        } catch (err) {
+            console.error("Erro ao carregar ranking:", err);
+            // Retorna dados vazios como fallback em vez de lançar erro
+            return { players: {}, history: [] };
+        }
     }
 
     // Sistema de pontuação baseado na posição final
@@ -46,7 +89,63 @@ class PokerRanking {
         const points = this.calculatePoints(parseInt(position), parseInt(totalPlayers));
         const gameDate = new Date();
 
-        // Atualizar dados do jogador
+        // Preparar dados para envio ao Google Sheets no formato esperado
+        const resultData = {
+            date: gameDate.toISOString().split('T')[0], // Formato YYYY-MM-DD
+            name: playerName,
+            position: parseInt(position),
+            totalPlayers: parseInt(totalPlayers),
+            points: points
+        };
+
+        // Se estiver em modo de desenvolvimento, simular salvamento
+        if (this.DEV_MODE) {
+            this.showNotification('🔧 Modo dev: Resultado simulado com sucesso!', 'success');
+            
+            // Atualizar dados locais para exibição imediata
+            if (!this.players[playerName]) {
+                this.players[playerName] = {
+                    name: playerName,
+                    totalPoints: 0,
+                    gamesPlayed: 0,
+                    wins: 0,
+                    positions: []
+                };
+            }
+
+            this.players[playerName].totalPoints += points;
+            this.players[playerName].gamesPlayed += 1;
+            this.players[playerName].positions.push(parseInt(position));
+            
+            if (parseInt(position) === 1) {
+                this.players[playerName].wins += 1;
+            }
+
+            // Adicionar ao histórico local
+            this.history.unshift({
+                id: Date.now(),
+                playerName,
+                position: parseInt(position),
+                totalPlayers: parseInt(totalPlayers),
+                points,
+                date: gameDate.toISOString()
+            });
+
+            // Atualizar display
+            this.updateDisplay();
+            this.clearForm();
+            return true;
+        }
+
+        try {
+            await this.salvarResultado(resultData);
+            this.showNotification('Resultado salvo com sucesso!', 'success');
+        } catch (error) {
+            console.error('Erro ao salvar no Google Sheets:', error);
+            this.showNotification('Erro ao salvar online - dados salvos localmente', 'warning');
+        }
+        
+        // Atualizar dados locais para exibição imediata
         if (!this.players[playerName]) {
             this.players[playerName] = {
                 name: playerName,
@@ -65,7 +164,7 @@ class PokerRanking {
             this.players[playerName].wins += 1;
         }
 
-        // Adicionar ao histórico
+        // Adicionar ao histórico local
         this.history.unshift({
             id: Date.now(),
             playerName,
@@ -75,15 +174,48 @@ class PokerRanking {
             date: gameDate.toISOString()
         });
 
-        // Salvar dados compartilhados
-        await this.saveSharedData();
-
         // Atualizar display
         this.updateDisplay();
         this.clearForm();
         
         this.showNotification(`Resultado adicionado! ${playerName} ganhou ${points} pontos.`, 'success');
         return true;
+    }
+
+    // Inicialização da aplicação
+    init() {
+        this.isOnline = navigator.onLine;
+        this.initializeEventListeners();
+        this.updateConnectionStatus();
+        
+        // Se estiver em modo de desenvolvimento, usar dados mock
+        if (this.DEV_MODE) {
+            this.loadMockData();
+            this.showNotification('🔧 Modo de desenvolvimento ativo - usando dados mock', 'info');
+        } else {
+            // Carregar dados do Google Sheets ao inicializar
+            this.loadSharedData();
+        }
+        
+        // Verificar conexão periodicamente
+        setInterval(() => this.updateConnectionStatus(), 30000);
+    }
+
+    // Carregar dados mock para desenvolvimento
+    loadMockData() {
+        this.players = {
+            'João': { name: 'João', totalPoints: 150, gamesPlayed: 10, wins: 3, positions: [] },
+            'Maria': { name: 'Maria', totalPoints: 120, gamesPlayed: 8, wins: 2, positions: [] },
+            'Pedro': { name: 'Pedro', totalPoints: 90, gamesPlayed: 6, wins: 1, positions: [] }
+        };
+        
+        this.history = [
+            { id: 1, playerName: 'João', position: 1, totalPlayers: 4, points: 25, date: '2024-01-15' },
+            { id: 2, playerName: 'Maria', position: 2, totalPlayers: 4, points: 18, date: '2024-01-15' },
+            { id: 3, playerName: 'Pedro', position: 3, totalPlayers: 4, points: 15, date: '2024-01-15' }
+        ];
+        
+        this.updateDisplay();
     }
 
     // Obter ranking ordenado
@@ -224,66 +356,62 @@ class PokerRanking {
         }
     }
 
-    // Carregar dados compartilhados do JSONBin.io
+    // Carregar dados compartilhados do Google Sheets
     async loadSharedData() {
         try {
             this.showNotification('Carregando dados compartilhados...', 'info');
             
-            const response = await fetch(`${this.jsonBinConfig.baseUrl}/${this.jsonBinConfig.binId}/latest`, {
-                method: 'GET',
-                headers: {
-                    'X-Master-Key': this.jsonBinConfig.apiKey,
-                    'X-Bin-Meta': 'false'
-                }
-            });
+            const dados = await this.carregarRanking();
             
-            if (response.ok) {
-                const data = await response.json();
-                this.players = data.players || {};
-                this.history = data.history || [];
-                this.showNotification('Dados carregados com sucesso!', 'success');
-            } else {
-                throw new Error('Falha ao carregar dados');
+            // Verificar se recebeu dados válidos
+            if (!dados.players && !dados.history) {
+                throw new Error('Nenhum dado recebido do servidor');
             }
+            
+            // Processar dados dos jogadores do novo formato
+            this.players = {};
+            if (dados.players && Object.keys(dados.players).length > 0) {
+                Object.keys(dados.players).forEach(playerName => {
+                    const playerData = dados.players[playerName];
+                    this.players[playerName] = {
+                        name: playerName,
+                        totalPoints: playerData.Points || 0,
+                        gamesPlayed: playerData.Games || 0,
+                        wins: playerData.Wins || 0,
+                        avgPoints: playerData.AvgPoints || 0,
+                        positions: [] // Será calculado do histórico se necessário
+                    };
+                });
+            }
+            
+            // Processar histórico do novo formato
+            this.history = [];
+            if (dados.history && Array.isArray(dados.history)) {
+                this.history = dados.history.map(item => ({
+                    id: Date.now() + Math.random(),
+                    playerName: item.Name,
+                    position: parseInt(item.Position),
+                    totalPlayers: parseInt(item.TotalPlayers),
+                    points: parseInt(item.Points),
+                    date: item.Date
+                }));
+            }
+            
+            this.showNotification('Dados carregados com sucesso!', 'success');
         } catch (error) {
-            console.warn('Erro ao carregar dados compartilhados, usando dados locais:', error);
+            console.warn('Erro ao carregar dados compartilhados:', error);
+            this.showNotification('Sem conexão - usando dados locais', 'info');
             this.loadLocalData();
-            this.showNotification('Usando dados locais (offline)', 'info');
         }
         
         this.updateDisplay();
     }
     
-    // Salvar dados compartilhados no JSONBin.io
+    // Salvar dados no Google Sheets (substitui saveSharedData)
     async saveSharedData() {
-        try {
-            const dataToSave = {
-                players: this.players,
-                history: this.history,
-                lastUpdated: new Date().toISOString()
-            };
-            
-            const response = await fetch(`${this.jsonBinConfig.baseUrl}/${this.jsonBinConfig.binId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Master-Key': this.jsonBinConfig.apiKey
-                },
-                body: JSON.stringify(dataToSave)
-            });
-            
-            if (response.ok) {
-                this.showNotification('Dados sincronizados!', 'success');
-                // Também salva localmente como backup
-                this.saveLocalData();
-            } else {
-                throw new Error('Falha ao salvar dados');
-            }
-        } catch (error) {
-            console.error('Erro ao salvar dados compartilhados:', error);
-            this.saveLocalData();
-            this.showNotification('Dados salvos localmente (offline)', 'info');
-        }
+        // Esta função agora é redundante pois salvamos individualmente
+        // Mantida para compatibilidade, mas não faz nada
+        console.log('saveSharedData chamada - dados são salvos automaticamente no Google Sheets');
     }
     
     // Salvar dados no localStorage (backup)
@@ -366,29 +494,23 @@ class PokerRanking {
         `;
     }
     
-    // Sincronização manual
+    // Sincronização manual com Google Sheets
     async manualSync() {
-        const statusElement = document.getElementById('syncStatus');
-        const syncButton = document.getElementById('syncData');
-        
-        // Mostrar status de sincronização
-        statusElement.className = 'sync-status syncing';
-        statusElement.innerHTML = `
-            <i class="fas fa-sync"></i>
-            <span>Sincronizando dados...</span>
-        `;
-        
-        syncButton.disabled = true;
-        
+        if (!navigator.onLine) {
+            this.showNotification('Sem conexão com a internet', 'error');
+            return;
+        }
+
         try {
-            // Recarregar dados do servidor
+            this.showNotification('Sincronizando...', 'info');
+            
+            // Recarregar dados do Google Sheets
             await this.loadSharedData();
+            
             this.showNotification('Sincronização concluída!', 'success');
         } catch (error) {
+            console.error('Erro na sincronização:', error);
             this.showNotification('Erro na sincronização', 'error');
-        } finally {
-            syncButton.disabled = false;
-            setTimeout(() => this.updateConnectionStatus(), 1000);
         }
     }
 
