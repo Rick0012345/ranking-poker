@@ -13,6 +13,9 @@ class PokerRanking {
         this.weeklyWinners = [];
         this.currentWeek = this.getCurrentWeekNumber();
         
+        // Cache busting - força recarregamento dos dados
+        this.cacheVersion = Date.now();
+        
         this.initSupabase();
         this.init();
     }
@@ -127,20 +130,26 @@ class PokerRanking {
     // Carregar dados do Supabase
     async loadSupabaseData() {
         try {
+            // Adicionar timestamp para evitar cache
+            const timestamp = Date.now();
+            
             // Carregar jogadores
             const { data: playersData, error: playersError } = await this.supabase
                 .from('players')
-                .select('*');
+                .select('*')
+                .order('name', { ascending: true });
 
             if (playersError) throw playersError;
 
-            // Converter array para objeto
+            // Converter array para objeto com validação de tipos
             const players = {};
             playersData.forEach(player => {
                 players[player.name] = {
-                    points: player.points,
-                    gamesPlayed: player.games_played,
-                    wins: player.wins
+                    points: parseInt(player.points) || 0,
+                    gamesPlayed: parseInt(player.games_played) || 0,
+                    wins: parseInt(player.wins) || 0,
+                    positions: [], // Inicializar array de posições
+                    totalPoints: parseInt(player.points) || 0
                 };
             });
 
@@ -153,11 +162,19 @@ class PokerRanking {
             if (historyError) throw historyError;
 
             const history = historyData.map(game => ({
-                playerName: game.player_name,
-                position: game.position,
-                points: game.points,
-                date: new Date(game.game_date).toISOString()
+                playerName: String(game.player_name),
+                position: parseInt(game.position),
+                points: parseInt(game.points),
+                date: new Date(game.game_date).toISOString(),
+                totalPlayers: parseInt(game.total_players) || 6 // Carregar total_players
             }));
+
+            // Reconstruir array de posições para cada jogador baseado no histórico
+            history.forEach(game => {
+                if (players[game.playerName]) {
+                    players[game.playerName].positions.push(game.position);
+                }
+            });
 
             // Carregar ganhadores semanais
             const { data: winnersData, error: winnersError } = await this.supabase
@@ -168,10 +185,18 @@ class PokerRanking {
             if (winnersError) throw winnersError;
 
             const weeklyWinners = winnersData.map(winner => ({
-                week: winner.week_number,
-                year: winner.year,
-                winners: [{ name: winner.winner_name, points: winner.points }]
+                week: parseInt(winner.week_number),
+                year: parseInt(winner.year),
+                winners: [{ 
+                    name: String(winner.winner_name), 
+                    points: parseInt(winner.points) 
+                }]
             }));
+
+            // Forçar atualização da interface após carregar dados
+            setTimeout(() => {
+                this.updateDisplay();
+            }, 100);
 
             return {
                 players,
@@ -190,12 +215,12 @@ class PokerRanking {
     // Salvar dados no Supabase
     async saveSupabaseData() {
         try {
-            // Salvar jogadores
+            // Salvar jogadores com validação de tipos
             const playersArray = Object.entries(this.players).map(([name, data]) => ({
-                name,
-                points: data.points,
-                games_played: data.gamesPlayed,
-                wins: data.wins
+                name: String(name),
+                points: parseInt(data.totalPoints) || 0,
+                games_played: parseInt(data.gamesPlayed) || 0,
+                wins: parseInt(data.wins) || 0
             }));
 
             // Upsert jogadores (inserir ou atualizar)
@@ -204,10 +229,13 @@ class PokerRanking {
                     .from('players')
                     .upsert(player, { onConflict: 'name' });
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('Erro ao salvar jogador:', player, error);
+                    throw error;
+                }
             }
 
-            // Salvar histórico (apenas novos registros)
+            // Salvar histórico (apenas novos registros) com validação
             const existingHistory = await this.supabase
                 .from('game_history')
                 .select('player_name, game_date, position');
@@ -223,17 +251,21 @@ class PokerRanking {
 
             if (newHistoryEntries.length > 0) {
                 const historyArray = newHistoryEntries.map(entry => ({
-                    player_name: entry.playerName,
-                    position: entry.position,
-                    points: entry.points,
-                    game_date: entry.date
+                    player_name: String(entry.playerName),
+                    position: parseInt(entry.position),
+                    points: parseInt(entry.points),
+                    game_date: entry.date,
+                    total_players: parseInt(entry.totalPlayers) || 6 // Adicionar campo total_players
                 }));
 
                 const { error } = await this.supabase
                     .from('game_history')
                     .insert(historyArray);
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('Erro ao salvar histórico:', historyArray, error);
+                    throw error;
+                }
             }
 
             console.log('Dados salvos no Supabase com sucesso');
@@ -247,18 +279,26 @@ class PokerRanking {
 
     // Sistema de pontuação baseado na posição final
     calculatePoints(position, totalPlayers) {
+        // Converter para números inteiros para garantir comparação correta
+        const pos = parseInt(position);
+        const total = parseInt(totalPlayers);
+        
+        console.log('calculatePoints - entrada:', { position: pos, totalPlayers: total });
+        
         const pointsTable = {
-            1: { 2: 10, 3: 15, 4: 20, 5: 25, 6: 30, 7: 35, 8: 40 },
-            2: { 2: 5, 3: 8, 4: 12, 5: 15, 6: 18, 7: 21, 8: 24 },
-            3: { 2: 0, 3: 4, 4: 6, 5: 8, 6: 10, 7: 12, 8: 14 },
-            4: { 2: 0, 3: 0, 4: 2, 5: 4, 6: 6, 7: 8, 8: 10 },
-            5: { 2: 0, 3: 0, 4: 0, 5: 0, 6: 2, 7: 4, 8: 6 },
-            6: { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 2 },
-            7: { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0 },
-            8: { 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0 }
+            2: { 1: 10, 2: 5 },
+            3: { 1: 15, 2: 8, 3: 3 },
+            4: { 1: 20, 2: 12, 3: 6, 4: 2 },
+            5: { 1: 25, 2: 15, 3: 8, 4: 4, 5: 1 },
+            6: { 1: 30, 2: 18, 3: 10, 4: 5, 5: 2, 6: 1 },
+            7: { 1: 35, 2: 21, 3: 12, 4: 7, 5: 3, 6: 2, 7: 1 },
+            8: { 1: 40, 2: 24, 3: 14, 4: 8, 5: 4, 6: 2, 7: 1, 8: 1 }
         };
         
-        return pointsTable[position]?.[totalPlayers] || 0;
+        const points = pointsTable[total]?.[pos] || 0;
+        console.log('calculatePoints - resultado:', points);
+        
+        return points;
     }
 
     // Adicionar resultado de partida
@@ -268,12 +308,25 @@ class PokerRanking {
             return false;
         }
 
+        // Converter para números e validar
+        const positionNum = parseInt(position);
+        const totalPlayersNum = parseInt(totalPlayers);
+        
+        if (isNaN(positionNum) || isNaN(totalPlayersNum) || positionNum < 1 || positionNum > totalPlayersNum) {
+            this.showNotification('Posição ou total de jogadores inválido', 'error');
+            return false;
+        }
+
         // Verificar se é uma nova semana e processar reset se necessário
         if (this.isNewWeek()) {
             await this.processWeeklyReset();
         }
 
-        const points = this.calculatePoints(parseInt(position), parseInt(totalPlayers));
+        // Calcular pontos
+        const points = this.calculatePoints(positionNum, totalPlayersNum);
+        
+        console.log('addGameResult - playerName:', playerName, 'position:', positionNum, 'totalPlayers:', totalPlayersNum, 'points:', points);
+        
         const gameDate = new Date();
 
         // Atualizar dados locais
@@ -289,22 +342,24 @@ class PokerRanking {
 
         this.players[playerName].totalPoints += points;
         this.players[playerName].gamesPlayed += 1;
-        this.players[playerName].positions.push(parseInt(position));
+        this.players[playerName].positions.push(positionNum);
         
-        if (parseInt(position) === 1) {
+        if (positionNum === 1) {
             this.players[playerName].wins += 1;
         }
 
-        // Adicionar ao histórico local
-        this.history.unshift({
+        // Adicionar ao histórico local com todos os campos necessários
+        const gameEntry = {
             id: Date.now(),
-            playerName,
-            position: parseInt(position),
-            totalPlayers: parseInt(totalPlayers),
-            points,
+            playerName: String(playerName),
+            position: positionNum,
+            totalPlayers: totalPlayersNum,
+            points: points,
             date: gameDate.toISOString(),
             week: this.currentWeek
-        });
+        };
+        
+        this.history.unshift(gameEntry);
 
         // Salvar dados
         await this.saveData();
@@ -313,13 +368,16 @@ class PokerRanking {
         this.updateDisplay();
         this.clearForm();
         
-        this.showNotification('Resultado salvo com sucesso!', 'success');
+        this.showNotification(`Resultado salvo! ${playerName} ganhou ${points} pontos.`, 'success');
         return true;
     }
 
     // Inicialização da aplicação
     async init() {
         this.initializeEventListeners();
+        
+        // Limpar cache do localStorage se necessário
+        this.clearBrowserCache();
         
         // Carregar dados
         const data = await this.loadData();
@@ -331,13 +389,163 @@ class PokerRanking {
         // Atualizar display
         this.updateDisplay();
         
-        const source = this.useLocalStorage ? 'dados locais' : 'Supabase';
-        this.showNotification(`Sistema carregado com ${source}`, 'success');
+        // Configurar atualização periódica para sincronização
+        this.setupPeriodicSync();
+    }
+
+    // Limpar cache do navegador
+    clearBrowserCache() {
+        try {
+            // Verificar se há uma versão anterior em cache
+            const cachedVersion = localStorage.getItem('pokerRanking_version');
+            const currentVersion = this.cacheVersion.toString();
+            
+            if (cachedVersion !== currentVersion) {
+                // Limpar dados antigos do localStorage
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('pokerRanking_')) {
+                        keysToRemove.push(key);
+                    }
+                }
+                
+                keysToRemove.forEach(key => localStorage.removeItem(key));
+                localStorage.setItem('pokerRanking_version', currentVersion);
+                
+                console.log('Cache limpo devido à nova versão');
+            }
+        } catch (error) {
+            console.warn('Erro ao limpar cache:', error);
+        }
+    }
+
+    // Método para forçar reload dos dados do Supabase
+    async forceReloadFromSupabase() {
+        try {
+            this.showNotification('Recarregando dados do Supabase...', 'info');
+            
+            // Forçar reconexão com Supabase
+            await this.initSupabase();
+            
+            if (!this.useLocalStorage && this.supabase) {
+                // Carregar dados diretamente do Supabase
+                const data = await this.loadSupabaseData();
+                
+                // Atualizar dados locais
+                this.players = data.players;
+                this.history = data.history;
+                this.weeklyWinners = data.weeklyWinners;
+                this.currentWeek = data.currentWeek;
+                
+                // Atualizar interface
+                this.updateDisplay();
+                
+                const playersCount = Object.keys(this.players).length;
+                const historyCount = this.history.length;
+                
+                this.showNotification(`Dados recarregados! ${playersCount} jogadores, ${historyCount} partidas`, 'success');
+                
+                console.log('Dados recarregados do Supabase:', {
+                    players: this.players,
+                    history: this.history,
+                    weeklyWinners: this.weeklyWinners
+                });
+                
+                return true;
+            } else {
+                this.showNotification('Não foi possível conectar ao Supabase. Usando dados locais.', 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('Erro ao recarregar dados do Supabase:', error);
+            this.showNotification('Erro ao recarregar dados: ' + error.message, 'error');
+            return false;
+        }
+    }
+
+    // Método para sincronizar dados manualmente
+    async manualSync() {
+        try {
+            this.showNotification('Sincronizando dados...', 'info');
+            
+            // Primeiro, salvar dados locais no Supabase (se houver)
+            if (!this.useLocalStorage) {
+                await this.saveSupabaseData();
+            }
+            
+            // Depois, recarregar dados do Supabase
+            const success = await this.forceReloadFromSupabase();
+            
+            if (success) {
+                this.showNotification('Sincronização concluída com sucesso!', 'success');
+            }
+            
+            return success;
+        } catch (error) {
+            console.error('Erro na sincronização manual:', error);
+            this.showNotification('Erro na sincronização: ' + error.message, 'error');
+            return false;
+        }
+    }
+
+    // Método para verificar status da conexão
+    async checkSupabaseConnection() {
+        try {
+            if (!this.supabase) {
+                return { connected: false, message: 'Cliente Supabase não inicializado' };
+            }
+            
+            const { data, error } = await this.supabase
+                .from('players')
+                .select('count', { count: 'exact', head: true });
+            
+            if (error) {
+                return { connected: false, message: error.message };
+            }
+            
+            return { connected: true, message: 'Conexão ativa', count: data };
+        } catch (error) {
+            return { connected: false, message: error.message };
+        }
+    }
+    setupPeriodicSync() {
+        // Sincronizar dados a cada 30 segundos se não estiver usando localStorage
+        if (!this.useLocalStorage) {
+            setInterval(async () => {
+                try {
+                    const data = await this.loadSupabaseData();
+                    
+                    // Verificar se houve mudanças
+                    const currentPlayersCount = Object.keys(this.players).length;
+                    const newPlayersCount = Object.keys(data.players).length;
+                    const currentHistoryCount = this.history.length;
+                    const newHistoryCount = data.history.length;
+                    
+                    if (newPlayersCount !== currentPlayersCount || newHistoryCount !== currentHistoryCount) {
+                        this.players = data.players;
+                        this.history = data.history;
+                        this.weeklyWinners = data.weeklyWinners;
+                        this.updateDisplay();
+                        console.log('Dados sincronizados automaticamente');
+                    }
+                } catch (error) {
+                    console.warn('Erro na sincronização automática:', error);
+                }
+            }, 30000); // 30 segundos
+         }
+         
+         const source = this.useLocalStorage ? 'dados locais' : 'Supabase';
+         this.showNotification(`Sistema carregado com ${source}`, 'success');
     }
 
     // Obter ranking ordenado
     getRanking() {
-        return Object.values(this.players)
+        return Object.entries(this.players)
+            .map(([name, player]) => ({
+                name: name,
+                ...player
+            }))
             .sort((a, b) => {
                 // Primeiro critério: pontos totais
                 if (b.totalPoints !== a.totalPoints) {
@@ -348,8 +556,12 @@ class PokerRanking {
                     return b.wins - a.wins;
                 }
                 // Terceiro critério: média de posição (menor é melhor)
-                const avgA = a.positions.reduce((sum, pos) => sum + pos, 0) / a.positions.length;
-                const avgB = b.positions.reduce((sum, pos) => sum + pos, 0) / b.positions.length;
+                const positionsA = a.positions || [];
+                const positionsB = b.positions || [];
+                const avgA = positionsA.length > 0 ? 
+                    positionsA.reduce((sum, pos) => sum + pos, 0) / positionsA.length : 0;
+                const avgB = positionsB.length > 0 ? 
+                    positionsB.reduce((sum, pos) => sum + pos, 0) / positionsB.length : 0;
                 return avgA - avgB;
             });
     }
@@ -374,7 +586,10 @@ class PokerRanking {
 
         tbody.innerHTML = ranking.map((player, index) => {
             const position = index + 1;
-            const average = player.positions.reduce((sum, pos) => sum + pos, 0) / player.positions.length;
+            // Verificar se player.positions existe e é um array antes de usar reduce
+            const positions = player.positions || [];
+            const average = positions.length > 0 ? 
+                positions.reduce((sum, pos) => sum + pos, 0) / positions.length : 0;
             const positionClass = position <= 3 ? `position-${position}` : 'position-other';
             
             return `
@@ -497,12 +712,28 @@ class PokerRanking {
     async deletePlayer(playerName) {
         if (confirm(`Tem certeza que deseja excluir ${playerName}? Esta ação não pode ser desfeita!`)) {
             try {
+                // Remover do Supabase primeiro
+                if (this.supabase) {
+                    // Deletar histórico do jogador
+                    const { error: historyError } = await this.supabase
+                        .from('game_history')
+                        .delete()
+                        .eq('player_name', playerName);
+                    
+                    if (historyError) throw historyError;
+                    
+                    // Deletar jogador
+                    const { error: playerError } = await this.supabase
+                        .from('players')
+                        .delete()
+                        .eq('name', playerName);
+                    
+                    if (playerError) throw playerError;
+                }
+                
                 // Remover dos dados locais
                 delete this.players[playerName];
                 this.history = this.history.filter(h => h.playerName !== playerName);
-                
-                // Salvar dados atualizados
-                await this.saveData();
                 
                 this.updateDisplay();
                 this.showNotification(`${playerName} foi excluído com sucesso!`, 'success');
@@ -538,6 +769,25 @@ class PokerRanking {
     // Função auxiliar para editar nome do jogador (implementação que estava faltando)
     async editPlayerName(oldName, newName) {
         try {
+            // Atualizar no Supabase primeiro
+            if (this.supabase) {
+                // Atualizar histórico do jogador
+                const { error: historyError } = await this.supabase
+                    .from('game_history')
+                    .update({ player_name: newName })
+                    .eq('player_name', oldName);
+                
+                if (historyError) throw historyError;
+                
+                // Atualizar jogador
+                const { error: playerError } = await this.supabase
+                    .from('players')
+                    .update({ name: newName })
+                    .eq('name', oldName);
+                
+                if (playerError) throw playerError;
+            }
+            
             // Atualizar dados locais
             if (this.players[oldName]) {
                 this.players[newName] = { ...this.players[oldName] };
@@ -545,15 +795,12 @@ class PokerRanking {
                 delete this.players[oldName];
             }
             
-            // Atualizar histórico
+            // Atualizar histórico local
             this.history.forEach(h => {
                 if (h.playerName === oldName) {
                     h.playerName = newName;
                 }
             });
-            
-            // Salvar dados atualizados
-            await this.saveData();
             
             this.updateDisplay();
             this.showNotification(`Nome alterado de ${oldName} para ${newName}`, 'success');
@@ -637,6 +884,17 @@ class PokerRanking {
             if (e.key === 'Enter') {
                 document.getElementById('addResult').click();
             }
+        });
+
+        // Botão recarregar dados
+        document.getElementById('reloadData').addEventListener('click', async () => {
+            this.showNotification('Recarregando dados do Supabase...', 'info');
+            await this.forceReloadFromSupabase();
+        });
+
+        // Botão verificar conexão
+        document.getElementById('checkConnection').addEventListener('click', async () => {
+            await this.checkSupabaseConnection();
         });
 
         // Botão limpar dados
