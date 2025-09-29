@@ -446,3 +446,353 @@ body {
     font-size: 0.9rem;
     opacity: 0.7;
 }
+
+/* Estilos para botões de ação */
+.actions-cell {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.btn-action {
+    background: none;
+    border: none;
+    padding: 8px;
+    margin: 0 2px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+}
+
+.btn-action:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-edit {
+    color: #3b82f6;
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+.btn-edit:hover {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #2563eb;
+}
+
+.btn-delete {
+    color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+.btn-delete:hover {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #dc2626;
+}
+
+/* Responsividade para botões de ação */
+@media (max-width: 768px) {
+    .btn-action {
+        padding: 6px;
+        min-width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+    
+    .actions-cell {
+        padding: 8px 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header-content h1 {
+        font-size: 1.8rem;
+    }
+    
+    .card h2 {
+        font-size: 1.5rem;
+    }
+    
+    .btn {
+        padding: 10px 16px;
+        font-size: 0.9rem;
+    }
+}
+
+/* Estilos para campos com erro de validação */
+.form-group input.error,
+.form-group select.error {
+    border-color: #e74c3c !important;
+    box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.2) !important;
+    background-color: rgba(231, 76, 60, 0.05) !important;
+}
+
+.form-group input.error:focus,
+.form-group select.error:focus {
+    border-color: #e74c3c !important;
+    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.3) !important;
+}
+
+/* Animação para campos com erro */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.form-group input.error,
+.form-group select.error {
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Melhorias no feedback visual de loading */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.btn .fa-spinner {
+    margin-right: 8px;
+}
+
+/* Status de sincronização melhorado */
+.sync-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.sync-status.connected {
+    background-color: rgba(46, 204, 113, 0.1);
+    color: #27ae60;
+    border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.sync-status.connecting {
+    background-color: rgba(241, 196, 15, 0.1);
+    color: #f39c12;
+    border: 1px solid rgba(241, 196, 15, 0.3);
+}
+
+.sync-status.disconnected {
+    background-color: rgba(231, 76, 60, 0.1);
+    color: #e74c3c;
+    border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.sync-status i {
+    font-size: 1.1em;
+}
+
+/* Seção de Ganhadores Semanais */
+.weekly-winners-section {
+    margin-bottom: 30px;
+}
+
+.current-week-info {
+    background: rgba(59, 130, 246, 0.1);
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    font-size: 0.9rem;
+}
+
+.weekly-winners-container {
+    display: grid;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+/* Pódium */
+.podium {
+    display: flex;
+    justify-content: center;
+    align-items: end;
+    gap: 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
+    border-radius: 15px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.podium-place {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    border-radius: 12px;
+    background: rgba(30, 41, 59, 0.8);
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    min-width: 140px;
+}
+
+.podium-place.first {
+    height: 180px;
+    border-color: #fbbf24;
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(251, 191, 36, 0.05) 100%);
+}
+
+.podium-place.second {
+    height: 150px;
+    border-color: #94a3b8;
+    background: linear-gradient(135deg, rgba(148, 163, 184, 0.1) 0%, rgba(148, 163, 184, 0.05) 100%);
+}
+
+.podium-place.third {
+    height: 120px;
+    border-color: #cd7f32;
+    background: linear-gradient(135deg, rgba(205, 127, 50, 0.1) 0%, rgba(205, 127, 50, 0.05) 100%);
+}
+
+.podium-icon {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
+
+.podium-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 5px;
+}
+
+.podium-info .position {
+    font-size: 0.8rem;
+    font-weight: 600;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.podium-info .player-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin-bottom: 5px;
+}
+
+.podium-info .total-points {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #94a3b8;
+}
+
+/* Histórico de Ganhadores */
+.weekly-winners-history {
+    background: rgba(30, 41, 59, 0.5);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+.weekly-winners-history h3 {
+    color: #e2e8f0;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.weekly-winners-history h3::before {
+    content: "📊";
+    font-size: 1.1rem;
+}
+
+.winners-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.winner-history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(51, 65, 85, 0.5);
+    border-radius: 8px;
+    border: 1px solid rgba(71, 85, 105, 0.3);
+    transition: all 0.3s ease;
+}
+
+.winner-history-item:hover {
+    background: rgba(51, 65, 85, 0.8);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.winner-week {
+    font-weight: 600;
+    color: #3b82f6;
+    font-size: 0.9rem;
+}
+
+.winner-podium {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.winner-position {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.85rem;
+}
+
+.winner-position .icon {
+    font-size: 1rem;
+}
+
+.winner-position .name {
+    font-weight: 500;
+    color: #e2e8f0;
+}
+
+.winner-position .points {
+    color: #94a3b8;
+    font-size: 0.8rem;
+}
+
+/* Responsividade para ganhadores semanais */
+@media (max-width: 768px) {
+    .podium {
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+    }
+    
+    .podium-place {
+        width: 100%;
+        max-width: 200px;
+        height: auto !important;
+        min-height: 120px;
+    }
+    
+    .winner-podium {
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-end;
+    }
+    
+    .winner-history-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+}

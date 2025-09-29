@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div class="container">
@@ -55,16 +57,10 @@
                 <div class="section-header">
                     <h2><i class="fas fa-trophy"></i> Ranking Atual</h2>
                     <div class="header-buttons">
-                        <button id="syncData" class="btn btn-primary">
-                            <i class="fas fa-sync"></i> Sincronizar
-                        </button>
                         <button id="clearData" class="btn btn-danger">
                             <i class="fas fa-trash"></i> Limpar Dados
                         </button>
                     </div>
-                </div>
-                <div class="sync-status" id="syncStatus">
-                    <i class="fas fa-wifi"></i> <span>Verificando conexão...</span>
                 </div>
                 <div class="ranking-table-container">
                     <table class="ranking-table">
@@ -76,12 +72,57 @@
                                 <th>Partidas</th>
                                 <th>Vitórias</th>
                                 <th>Média</th>
+                                <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody id="rankingTableBody">
                             <!-- Dados serão inseridos via JavaScript -->
                         </tbody>
                     </table>
+                </div>
+            </section>
+
+            <!-- Seção de Ganhadores Semanais -->
+            <section class="card weekly-winners-section">
+                <div class="section-header">
+                    <h2><i class="fas fa-crown"></i> Ganhadores Semanais</h2>
+                    <div class="current-week-info">
+                        <span id="currentWeekDisplay">Semana atual: <strong id="currentWeekNumber">-</strong></span>
+                    </div>
+                </div>
+                <div class="weekly-winners-container">
+                    <div class="podium">
+                        <div class="podium-place second">
+                            <div class="podium-icon">🥈</div>
+                            <div class="podium-info">
+                                <span class="position">2º Lugar</span>
+                                <span class="player-name" id="weeklySecond">-</span>
+                                <span class="total-points" id="weeklySecondPoints">0 pts</span>
+                            </div>
+                        </div>
+                        <div class="podium-place first">
+                            <div class="podium-icon">🥇</div>
+                            <div class="podium-info">
+                                <span class="position">1º Lugar</span>
+                                <span class="player-name" id="weeklyFirst">-</span>
+                                <span class="total-points" id="weeklyFirstPoints">0 pts</span>
+                            </div>
+                        </div>
+                        <div class="podium-place third">
+                            <div class="podium-icon">🥉</div>
+                            <div class="podium-info">
+                                <span class="position">3º Lugar</span>
+                                <span class="player-name" id="weeklyThird">-</span>
+                                <span class="total-points" id="weeklyThirdPoints">0 pts</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="weekly-winners-history">
+                        <h3>Histórico de Ganhadores</h3>
+                        <div id="weeklyWinnersHistory" class="winners-history-list">
+                            <!-- Histórico de ganhadores será inserido via JavaScript -->
+                        </div>
+                    </div>
                 </div>
             </section>
 
